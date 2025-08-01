@@ -1,0 +1,25 @@
+# Teste de requisição POST
+GET  http://localhost:3000/api/v1/users
+content-type: application/json
+
+###
+POST http://localhost:3000/api/v1/users 
+content-type: application/json
+
+{
+    "username": "Bret"
+}
+
+###
+POST http://localhost:5000/translate
+content-type: application/json
+
+{
+    "q": "exercitationem et id quae cum omnisvoluptatibus accusantium et quidemut ipsam sintdoloremque illo ex atque necessitatibus sed",
+    "source": "en",
+    "target": "pt",
+    "format": "text",
+    "api_key": ""
+
+}
+
