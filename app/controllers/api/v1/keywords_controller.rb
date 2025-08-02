@@ -28,8 +28,8 @@ class Api::V1::KeywordsController < Api::V1::BaseController
   end
 
   def destroy
-    @keyword.destroy
-    head :no_content
+    @keyword.update!(active: false)
+    render json: { message: "Keyword deactivated successfully" }
   end
 
   private

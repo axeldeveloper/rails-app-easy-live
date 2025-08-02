@@ -15,13 +15,22 @@ POST http://localhost:5000/translate
 content-type: application/json
 
 {
-    "q": "exercitationem et id quae cum omnisvoluptatibus accusantium et quidemut ipsam sintdoloremque illo ex atque necessitatibus sed",
+    "q": "good morning",
     "source": "en",
-    "target": "pt",
+    "target": "ca",
     "format": "text",
     "api_key": ""
 
 }
+
+###
+### MyMemory Translation - GET
+GET https://api.mymemory.translated.net/get?q=corrupti inventore&langpair=en|pt
+Content-Type: application/json
+
+
+### Google Translate Free
+GET https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=pt&dt=t&q=good morning
 
 ###
 POST http://localhost:3000/api/v1/keywords

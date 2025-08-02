@@ -8,9 +8,11 @@ Rails.application.routes.draw do
   # API Routes
   namespace :api do
     namespace :v1 do
-      resources :users, only: [ :create ]
+      resources :users, only: [ :create, :show ], param: :username
+      # Keywords management
       resources :keywords, only: [ :index, :show, :create, :update, :destroy ]
-      # resources :comments, only: [:index, :show]
+      # Progress tracking
+      resources :progress, only: [ :index, :show ]
     end
   end
 

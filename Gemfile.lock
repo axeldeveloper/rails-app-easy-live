@@ -107,6 +107,9 @@ GEM
       dotenv (= 3.1.8)
       railties (>= 6.1)
     drb (2.2.3)
+    easy_translate (0.5.1)
+      thread
+      thread_safe
     ed25519 (1.4.0)
     erb (5.0.2)
     erubi (1.13.1)
@@ -341,6 +344,8 @@ GEM
       ostruct
     stringio (3.1.7)
     thor (1.4.0)
+    thread (0.2.2)
+    thread_safe (0.3.6)
     thruster (0.1.14)
     thruster (0.1.14-aarch64-linux)
     thruster (0.1.14-arm64-darwin)
@@ -379,6 +384,7 @@ DEPENDENCIES
   debug
   descriptive_statistics
   dotenv-rails
+  easy_translate (~> 0.5)
   factory_bot_rails
   httparty
   kamal

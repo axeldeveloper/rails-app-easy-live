@@ -35,31 +35,32 @@ gem "thruster", require: false
 # Use Rack CORS for handling Cross-Origin Resource Sharing (CORS), making cross-origin Ajax possible
 # gem "rack-cors"
 
-gem 'redis', '~> 5.0'  # Versão estável
+gem "redis", "~> 5.0"  # Versão estável
 
 # API HTTP
-gem 'httparty'
+gem "httparty"
 
 # Background Job
-gem 'sidekiq'
+gem "sidekiq"
 
 # State machine
-gem 'aasm'
+gem "aasm"
 
 # Statistical calculation
-gem 'descriptive_statistics'
+gem "descriptive_statistics"
 
 
+# Translation
+gem "easy_translate", "~> 0.5"
 
 
-
-gem 'dotenv-rails', groups: [:development, :test]
+gem "dotenv-rails", groups: [ :development, :test ]
 
 group :development, :test do
-  gem 'factory_bot_rails'
-  gem 'database_cleaner'
-  gem 'rspec-rails'
-  
+  gem "factory_bot_rails"
+  gem "database_cleaner"
+  gem "rspec-rails"
+
   # See https://guides.rubyonrails.org/debugging_rails_applications.html#debugging-with-the-debug-gem
   gem "debug", platforms: %i[ mri windows ], require: "debug/prelude"
 

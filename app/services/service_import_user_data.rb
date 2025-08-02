@@ -2,21 +2,36 @@ class ServiceImportUserData
     include HTTParty
 
     base_uri "https://jsonplaceholder.typicode.com"
-
-    default_timeout 10 # Adiciona timeout para evitar requisições travadas
+    default_timeout 10
 
     class ApiError < StandardError; end
 
-    def self.call(username)
+    def self.call(username, import_job_id = nil)
+      imported_comments = []
+      @import_job = ImportJob.find_by(id: import_job_id) if import_job_id
+
+      update_progress("Finding user...")
       user_data = fetch_user(username)
       return unless user_data
 
       ActiveRecord::Base.transaction do
-        Rails.logger.info "Inicio da transation "
+        Rails.logger.info "Inicio da transacao"
         local_user = create_or_update_user(user_data)
-        import_posts_for_user(local_user, user_data["id"])
-        local_user # Retorna o usuário criado/atualizado
+        imported_comments = import_posts_for_user(local_user, user_data["id"])
+
+
+        update_progress("Calculating metrics...")
+        local_user.user_metric.recalculate!
+        GroupMetric.current.recalculate!
+
+        local_user.update!(status: "completed")
+        @import_job&.complete!
+        local_user
       end
+
+      # DEPOIS da transação, enfileirar os jobs
+      enqueue_comment_processing_jobs(imported_comments)
+
     rescue ApiError => e
       Rails.logger.error "Failed to import user data: #{e.message}"
       nil
@@ -26,12 +41,8 @@ class ServiceImportUserData
 
     # Métodos de busca na API
     def self.fetch_user(username)
-      # ?username=Bret
       response = handle_errors { get("/users", query: { username: username }) }
-      Rails.logger.info "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
-      Rails.logger.info "Executing fetch_user "
-      Rails.logger.info response.first
-      # return nil if response.empty?
+      Rails.logger.info "Executing fetch_user: #{response.first}"
       response.first
     end
 
@@ -45,14 +56,11 @@ class ServiceImportUserData
 
     # Métodos de criação/atualização
     def self.create_or_update_user(user_data)
-      Rails.logger.info "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
-      Rails.logger.info "Executing create_or_update_user "
-      Rails.logger.info user_data
+      update_progress("Creating user record...")
+      Rails.logger.info "Executing create_or_update_user: #{user_data['name']}"
 
       User.find_or_create_by!(external_id: user_data["id"]) do |user|
-        user.assign_attributes(
-          name: user_data["name"]
-        )
+        user.assign_attributes(username: user_data["username"])
       end
     end
 
@@ -60,17 +68,7 @@ class ServiceImportUserData
       local_user.posts.find_or_create_by!(external_id: post_data["id"]) do |post|
         post.assign_attributes(
           title: post_data["title"],
-          body: post_data["body"],
-        )
-      end
-    end
-
-
-    def self.create_or_update_comment2(post, comment_data)
-      post.comments.find_or_create_by!(external_id: comment_data["id"]) do |comment|
-        comment.assign_attributes(
-          body: comment_data["body"],
-          status: "novo"
+          body: post_data["body"]
         )
       end
     end
@@ -82,7 +80,7 @@ class ServiceImportUserData
 
       comment.assign_attributes(
         body: comment_data["body"]&.strip,
-        status: comment.new_record? ? "novo" : comment.status # Só muda status se for novo
+        status: comment.new_record? ? "novo" : comment.status
       )
 
       comment.save!
@@ -92,26 +90,44 @@ class ServiceImportUserData
       nil
     end
 
-
-
-    # Métodos de importação em lote
+    # Métodos de importação em lote - RETORNA array de comment IDs
     def self.import_posts_for_user(local_user, user_id)
-      Rails.logger.info "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
-      Rails.logger.info "Executing import_posts_for_user "
-      Rails.logger.info local_user
-      Rails.logger.info user_id
+      Rails.logger.info "Executing import_posts_for_user for user: #{local_user.id}"
+      update_progress("Importing posts...")
+      comment_ids = []
       posts_data = fetch_posts(user_id)
+
       posts_data.each do |post_data|
         post = create_or_update_post(local_user, post_data)
-        import_comments_for_post(post, post_data["id"])
+        post_comment_ids = import_comments_for_post(post, post_data["id"])
+        comment_ids.concat(post_comment_ids)
       end
+
+      comment_ids.compact
     end
 
     def self.import_comments_for_post(post, post_id)
+      update_progress("Processing comments...")
+      comment_ids = []
       comments_data = fetch_comments(post_id)
+
       comments_data.each do |comment_data|
         comment = create_or_update_comment(post, comment_data)
-        ProcessCommentJob.perform_later(comment.id) if comment.persisted?
+        comment_ids << comment.id if comment&.persisted?
+      end
+
+      comment_ids
+    end
+
+    # Enfileirar jobs APÓS a transação
+    def self.enqueue_comment_processing_jobs(comment_ids)
+      return if comment_ids.empty?
+
+      Rails.logger.info "Enfileirando #{comment_ids.size} jobs de processamento"
+
+      comment_ids.each do |comment_id|
+        # Delay opcional para garantir que o commit foi processado
+        ProcessCommentJob.set(wait: 2.seconds).perform_later(comment_id)
       end
     end
 
@@ -121,10 +137,17 @@ class ServiceImportUserData
       raise ApiError, "API request failed with status #{response.code}" unless response.success?
       response
     rescue Net::ReadTimeout, Net::OpenTimeout => e
+      Rails.logger.error "Request timeout: #{e.message}"
       raise ApiError, "Request timeout: #{e.message}"
-      Rails.logger.info e.message
     rescue SocketError => e
+      Rails.logger.error "Connection failed: #{e.message}"
       raise ApiError, "Connection failed: #{e.message}"
-      Rails.logger.info e.message
+    end
+
+    def self.update_progress(message)
+      return unless @import_job
+
+      @import_job.increment_progress!
+      @import_job.update(progress_data: { current_step: message })
     end
 end
