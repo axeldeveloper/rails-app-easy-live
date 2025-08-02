@@ -10,6 +10,13 @@ class Api::V1::UsersController < Api::V1::BaseController
       return render json: { error: "Username is required" }, status: :bad_request
     end
 
+    # Check if user already exists and is processed
+    existing_user = User.find_by(username: username)
+    if existing_user&.status == "completed"
+      return render json: build_user_response(existing_user), status: :ok
+    end
+
+
     # Create import job for progress tracking
     import_job = ImportJob.create!(username: username, status: "running")
 
@@ -28,6 +35,7 @@ class Api::V1::UsersController < Api::V1::BaseController
   # GET /api/v1/users/:username
   def show
     user = User.find_by!(username: params[:username])
+
 
     if user.status != "completed"
       return render json: { error: "User import not completed yet" }, status: :accepted
